@@ -7050,10 +7050,10 @@ html, body { min-height:100vh; font-family:'Sora',sans-serif; overflow-x:hidden;
         </div>
       </div>
       <div class="adm-page" id="adm-p-docentes" style="display:none;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
           <div>
-            <h2 style="font-family:'Fraunces',serif;font-size:22px;color:#0d1a0f;font-weight:700;">Personal y materias</h2>
-            <div style="font-size:13px;color:#64748b;margin-top:2px;">Una sola vista para personal escolar, catálogo académico y asignación docente</div>
+            <h2 style="font-family:'Fraunces',serif;font-size:22px;color:#0d1a0f;font-weight:700;">📚 Personal y materias</h2>
+            <div style="font-size:13px;color:#64748b;">Altas de personal, catálogo académico y asignación docente desde un solo panel</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button onclick="ADM.abrirModalPersonal()" style="padding:10px 18px;background:linear-gradient(135deg,#0d5c2f,#157a40);color:white;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(13,92,47,.3);transition:.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''">+ Alta de personal</button>
@@ -7061,29 +7061,30 @@ html, body { min-height:100vh; font-family:'Sora',sans-serif; overflow-x:hidden;
             <button onclick="ADM.abrirModalNuevaAsignacion()" style="padding:10px 18px;background:white;color:#166534;border:1.5px solid #86efac;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Nueva asignación</button>
           </div>
         </div>
-        <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:18px;flex-wrap:wrap;">
-          <button id="adm-personal-tab-equipo" onclick="admPersonalHubTab('equipo')" style="padding:10px 20px;border:none;background:none;font-family:'Sora',sans-serif;font-size:13px;font-weight:700;color:#0d5c2f;border-bottom:2px solid #0d5c2f;margin-bottom:-2px;cursor:pointer;">👨‍🏫 Equipo</button>
+        <div id="adm-personal-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px;"></div>
+        <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:20px;flex-wrap:wrap;">
+          <button id="adm-personal-tab-equipo" onclick="admPersonalHubTab('equipo')" style="padding:10px 20px;border:none;background:none;font-family:'Sora',sans-serif;font-size:13px;font-weight:700;color:#0d5c2f;border-bottom:2px solid #0d5c2f;margin-bottom:-2px;cursor:pointer;">👨‍🏫 Personal</button>
           <button id="adm-personal-tab-catalogo" onclick="admPersonalHubTab('catalogo')" style="padding:10px 20px;border:none;background:none;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;">📖 Catálogo</button>
           <button id="adm-personal-tab-asignaciones" onclick="admPersonalHubTab('asignaciones')" style="padding:10px 20px;border:none;background:none;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;">🗂 Asignaciones</button>
         </div>
         <div id="adm-personal-panel-equipo">
-          <div style="background:white;border:1px solid #e2e8f0;border-radius:16px;padding:16px;margin-bottom:16px;">
-            <div style="font-size:14px;font-weight:800;color:#0f172a;">Equipo escolar</div>
-            <div style="font-size:12px;color:#64748b;margin-top:4px;">Administra docentes, coordinaciones, trabajo social, prefectura y directivos sin salir de esta sección.</div>
+          <div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:16px;padding:16px;margin-bottom:16px;">
+            <div style="font-size:14px;font-weight:800;color:#92400e;">Gestión de personal escolar</div>
+            <div style="font-size:12px;color:#78716c;margin-top:4px;">Agrega profesores, coordinaciones y personal de apoyo aquí mismo; desde cada tarjeta puedes invitar, asignar materias o completar pendientes.</div>
           </div>
           <div id="adm-docentes-list"></div>
         </div>
         <div id="adm-personal-panel-catalogo" style="display:none;">
-          <div style="background:white;border:1px solid #e2e8f0;border-radius:16px;padding:16px;margin-bottom:16px;">
-            <div style="font-size:14px;font-weight:800;color:#0f172a;">Catálogo académico por grado</div>
-            <div style="font-size:12px;color:#64748b;margin-top:4px;">Revisa qué materias faltan y agrega nuevas sin cambiar de módulo.</div>
+          <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:16px;padding:16px;margin-bottom:16px;">
+            <div style="font-size:14px;font-weight:800;color:#1d4ed8;">Catálogo académico por grado</div>
+            <div style="font-size:12px;color:#64748b;margin-top:4px;">Mantén actualizado el catálogo y detecta qué materias siguen faltando por cubrir.</div>
           </div>
           <div id="adm-materias-cat-list"></div>
         </div>
         <div id="adm-personal-panel-asignaciones" style="display:none;">
-          <div style="background:white;border:1px solid #e2e8f0;border-radius:16px;padding:16px;margin-bottom:16px;">
-            <div style="font-size:14px;font-weight:800;color:#0f172a;">Asignaciones por docente</div>
-            <div style="font-size:12px;color:#64748b;margin-top:4px;">Consulta materias y grupos por persona para detectar vacíos rápidamente.</div>
+          <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:16px;padding:16px;margin-bottom:16px;">
+            <div style="font-size:14px;font-weight:800;color:#166534;">Asignaciones por docente</div>
+            <div style="font-size:12px;color:#64748b;margin-top:4px;">Ve quién ya tiene grupos y materias, y localiza rápido a quién todavía le falta asignación.</div>
           </div>
           <div id="adm-asignaciones-list"></div>
         </div>

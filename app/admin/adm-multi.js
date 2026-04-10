@@ -1342,9 +1342,74 @@ ADM.eliminarGrupo = async function(id, nombre) {
 // DOCENTES Y STAFF
 // ═══════════════════════════════════════════════════════
 
+ADM.renderPersonalMateriasResumen = function() {
+  const el = document.getElementById('adm-personal-kpis');
+  if (!el) return;
+
+  const docentesActivos = (ADM.docentes || []).filter(d => (d.rol || 'docente') !== 'padre');
+  const docentesFrente = docentesActivos.filter(d => ['docente', 'tutor'].includes(d.rol || 'docente'));
+  const sinAsignacion = docentesFrente.filter(d => !(window._admAsignaciones?.[d.id] || []).length);
+  const grupos = ADM.grupos || [];
+  const detalleGrupos = grupos.map(g => {
+    const cobertura = typeof ADM._coberturaGrupo === 'function'
+      ? ADM._coberturaGrupo(g)
+      : { faltantes: [], cubiertas: [], esperadas: [] };
+    return { grupo: g, cobertura };
+  });
+  const gruposConPendientes = detalleGrupos.filter(d => d.cobertura?.faltantes?.length).length;
+  const materiasPendientes = detalleGrupos.reduce((acc, d) => acc + (d.cobertura?.faltantes?.length || 0), 0);
+  const coberturaEsperada = detalleGrupos.reduce((acc, d) => acc + (d.cobertura?.esperadas?.length || 0), 0);
+  const coberturaCubierta = detalleGrupos.reduce((acc, d) => acc + (d.cobertura?.cubiertas?.length || 0), 0);
+  const avance = coberturaEsperada ? Math.round((coberturaCubierta / coberturaEsperada) * 100) : 0;
+
+  const cards = [
+    {
+      title: 'Profesores y personal',
+      value: String(docentesActivos.length),
+      sub: `${docentesFrente.length} frente a grupo`,
+      tone: 'linear-gradient(135deg,#fff7ed,#fffbeb)',
+      border: '#fdba74',
+      accent: '#c2410c',
+    },
+    {
+      title: 'Docentes por completar',
+      value: String(sinAsignacion.length),
+      sub: sinAsignacion.length ? 'todavía sin materia o grupo' : 'todos ya tienen asignación',
+      tone: sinAsignacion.length ? 'linear-gradient(135deg,#fef2f2,#fff7ed)' : 'linear-gradient(135deg,#f0fdf4,#ecfeff)',
+      border: sinAsignacion.length ? '#fca5a5' : '#86efac',
+      accent: sinAsignacion.length ? '#b91c1c' : '#15803d',
+    },
+    {
+      title: 'Materias pendientes',
+      value: String(materiasPendientes),
+      sub: gruposConPendientes ? `${gruposConPendientes} grupos con faltantes` : 'sin faltantes detectados',
+      tone: materiasPendientes ? 'linear-gradient(135deg,#fffbeb,#fff7ed)' : 'linear-gradient(135deg,#f0fdf4,#ecfdf5)',
+      border: materiasPendientes ? '#fde68a' : '#86efac',
+      accent: materiasPendientes ? '#a16207' : '#166534',
+    },
+    {
+      title: 'Cobertura actual',
+      value: `${avance}%`,
+      sub: `${coberturaCubierta}/${coberturaEsperada || 0} materias cubiertas`,
+      tone: 'linear-gradient(135deg,#eff6ff,#f8fafc)',
+      border: '#bfdbfe',
+      accent: '#1d4ed8',
+    },
+  ];
+
+  el.innerHTML = cards.map(card => `
+    <div style="background:${card.tone};border:1.5px solid ${card.border};border-radius:16px;padding:16px;">
+      <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px;">${card.title}</div>
+      <div style="font-size:28px;font-weight:900;color:${card.accent};line-height:1.05;">${card.value}</div>
+      <div style="font-size:12px;color:#64748b;margin-top:8px;">${card.sub}</div>
+    </div>
+  `).join('');
+};
+
 ADM.renderDocentes = function() {
   const el = document.getElementById('adm-docentes-list');
   if (!el) return;
+  ADM.renderPersonalMateriasResumen();
   if (!ADM.docentes.length) {
     el.innerHTML = `<div class="adm-empty" style="padding:48px 20px;text-align:center;">
       <div style="font-size:48px;margin-bottom:12px;">👨‍🏫</div>
@@ -3048,6 +3113,7 @@ window.admPersonalHubTab = admPersonalHubTab;
 ADM.renderMaterias = function() {
   const el = document.getElementById('adm-materias-cat-list');
   if (!el) return;
+  ADM.renderPersonalMateriasResumen();
 
   const nivelEsc = ADM.escuelaNivel || window._admNivelActivo || window._nivelActivo || 'secundaria';
   const asignaciones = window._admMateriasData || [];
@@ -3431,6 +3497,7 @@ ADM.popularSelects = function() {
 ADM.renderAsignaciones = function() {
   const el = document.getElementById('adm-asignaciones-list');
   if (!el) return;
+  ADM.renderPersonalMateriasResumen();
 
   if (!ADM.docentes.length) {
     el.innerHTML = `<div class="adm-empty" style="padding:48px 20px;text-align:center;">

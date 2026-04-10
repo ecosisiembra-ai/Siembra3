@@ -253,11 +253,15 @@ function nemFichaInit() {
   const opts = (ADM.alumnos || []).map(a => `<option value="${a.id}">${(a.nombre+' '+(a.apellido||a.apellido_p||'')).trim()}</option>`).join('');
   sel.innerHTML = '<option value="">Seleccionar alumno…</option>' + opts;
 }
-function nemFichaCargar(id) {
+async function nemFichaCargar(id) {
   if (!id) return;
   const a = (ADM.alumnos || []).find(x => x.id === id);
   if (!a) return;
-  const set = (elId, val) => { const el = document.getElementById(elId); if(el && val) el.value = val; };
+  const set = (elId, val) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (val !== undefined && val !== null && val !== '') el.value = val;
+  };
   set('nf-nombre', a.nombre);
   set('nf-ap', a.apellido_p || (a.apellido||'').split(' ')[0]);
   set('nf-am', a.apellido_m || (a.apellido||'').split(' ')[1]);
@@ -265,8 +269,50 @@ function nemFichaCargar(id) {
   set('nf-nac', a.fecha_nacimiento || a.fecha_nac);
   set('nf-tutor-nom', a.tutor_nombre);
   set('nf-tutor-tel', a.telefono_tutor);
+  const grp = a.alumnos_grupos?.[0]?.grupos || {};
+  set('nf-grado', grp.grado || '');
+  set('nf-grupo-ltr', grp.seccion || '');
+
+  try {
+    if (!window.sb || !id) return;
+    const { data: ficha } = await sb.from('fichas_inscripcion').select('*').eq('alumno_id', id).maybeSingle();
+    if (!ficha) return;
+    set('nf-nombre', ficha.nombre);
+    set('nf-ap', ficha.apellido_p);
+    set('nf-am', ficha.apellido_m);
+    set('nf-curp', ficha.curp);
+    set('nf-nac', ficha.fecha_nacimiento);
+    set('nf-sexo', ficha.sexo);
+    set('nf-lugar-nac', ficha.lugar_nacimiento);
+    set('nf-sangre', ficha.tipo_sangre);
+    set('nf-lengua', ficha.lengua_indigena);
+    set('nf-tutor-nom', ficha.tutor_nombre);
+    set('nf-tutor-rel', ficha.tutor_parentesco);
+    set('nf-tutor-tel', ficha.telefono_1);
+    set('nf-tutor-tel2', ficha.telefono_2);
+    set('nf-tutor-email', ficha.email_tutor);
+    set('nf-domicilio', ficha.domicilio);
+    set('nf-municipio', ficha.municipio);
+    set('nf-cp', ficha.cp);
+    set('nf-ocupacion', ficha.ocupacion_tutor);
+    set('nf-escolaridad', ficha.escolaridad_tutor);
+    set('nf-grado', ficha.grado);
+    set('nf-grupo-ltr', ficha.grupo_letra);
+    set('nf-turno', ficha.turno);
+    set('nf-esc-proc', ficha.esc_procedencia);
+    set('nf-programa', ficha.programa_apoyo);
+    set('nf-obs-salud', ficha.obs_salud);
+    set('nf-vivienda', ficha.vivienda);
+    set('nf-hogar-personas', ficha.hogar_personas);
+    set('nf-inet', ficha.tiene_internet ? '1' : '0');
+    set('nf-dispositivo', ficha.dispositivo);
+    set('nf-distancia', ficha.distancia_esc);
+    set('nf-trabaja', ficha.trabaja_alumno);
+  } catch(e) {
+    console.warn('[nemFichaCargar]', e.message);
+  }
 }
-async function nemFichaGuardar() {
+async function nemFichaGuardar(seccion = 'completa') {
   const alumnoId = document.getElementById('nem-ficha-alumno-sel')?.value;
   const payload = {
     alumno_id:       alumnoId || null,
@@ -327,8 +373,11 @@ async function nemFichaGuardar() {
     }
     localStorage.setItem('siembra_ficha_' + (alumnoId||payload.curp), JSON.stringify(payload));
     const res = document.getElementById('nf-resultado');
-    if (res) { res.textContent = '✅ Ficha guardada para ' + payload.nombre + ' ' + payload.apellido_p; res.style.display='block'; }
-    hubToast('✅ Ficha guardada' + (payload.email_tutor ? ' · Padre vinculado por correo' : ''), 'ok');
+    const textoOk = seccion === 'padre'
+      ? `✅ Datos del padre/tutor guardados para ${payload.nombre} ${payload.apellido_p || ''}`.trim()
+      : '✅ Ficha guardada para ' + payload.nombre + ' ' + payload.apellido_p;
+    if (res) { res.textContent = textoOk; res.style.display='block'; }
+    hubToast((seccion === 'padre' ? '✅ Datos del padre guardados' : '✅ Ficha guardada') + (payload.email_tutor ? ' · Padre vinculado por correo' : ''), 'ok');
   } catch(e) {
     localStorage.setItem('siembra_ficha_' + (alumnoId||payload.curp||Date.now()), JSON.stringify(payload));
     hubToast('✅ Ficha guardada localmente', 'ok');

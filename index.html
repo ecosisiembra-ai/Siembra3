@@ -7117,6 +7117,7 @@ html, body { min-height:100vh; font-family:'Sora',sans-serif; overflow-x:hidden;
         <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:20px;flex-wrap:wrap;">
           <button id="imp-tab-alumnos" onclick="admImportTab('alumnos')" style="padding:10px 22px;border:none;background:none;font-family:'Sora',sans-serif;font-size:13px;font-weight:700;color:#0d5c2f;border-bottom:2px solid #0d5c2f;margin-bottom:-2px;cursor:pointer;">👨‍🎓 Alumnos</button>
           <button id="imp-tab-docentes" onclick="admImportTab('docentes')" style="padding:10px 22px;border:none;background:none;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;">👨‍🏫 Personal docente</button>
+          <button id="imp-tab-padres" onclick="admImportTab('padres')" style="padding:10px 22px;border:none;background:none;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;">👨‍👩‍👧 Padres y tutores</button>
           <button onclick="admAbrirSige()" style="padding:10px 22px;border:none;background:none;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;color:#1e40af;cursor:pointer;display:flex;align-items:center;gap:6px;">📊 SIGE / Estadística 911</button>
         </div>
 
@@ -7175,6 +7176,31 @@ html, body { min-height:100vh; font-family:'Sora',sans-serif; overflow-x:hidden;
           <div id="imp-btn-docentes" style="display:none;margin-top:16px;">
             <button onclick="admConfirmarImport('docentes')" style="padding:13px 28px;background:linear-gradient(135deg,#1e3a5f,#2455a4);color:white;border:none;border-radius:11px;font-family:'Sora',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(30,58,95,.3);">✅ Importar personal a SIEMBRA</button>
             <button onclick="admLimpiarImport('docentes')" style="margin-left:10px;padding:13px 20px;background:white;border:1.5px solid #e2e8f0;color:#64748b;border-radius:11px;font-family:'Sora',sans-serif;font-size:13px;cursor:pointer;">✕ Cancelar</button>
+          </div>
+        </div>
+        <div id="imp-panel-padres" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+            <div style="background:white;border-radius:14px;border:1px solid #e2e8f0;padding:20px;">
+              <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px;">1. Descarga la plantilla</div>
+              <div style="font-size:12px;color:#64748b;margin-bottom:14px;">Carga padres, madres o tutores y relaciónalos con el alumno usando CURP o nombre del alumno.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button onclick="admDescargarPlantilla('padres','xlsx')" style="padding:9px 14px;background:#fff7ed;border:1.5px solid #fdba74;color:#c2410c;border-radius:9px;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">⬇️ Plantilla Excel</button>
+                <button onclick="admDescargarPlantilla('padres','csv')" style="padding:9px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;color:#475569;border-radius:9px;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">⬇️ Plantilla CSV</button>
+              </div>
+            </div>
+            <div style="background:white;border-radius:14px;border:1px solid #e2e8f0;padding:20px;">
+              <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px;">2. Sube tu archivo</div>
+              <div style="font-size:12px;color:#64748b;margin-bottom:14px;">Acepta Excel, CSV, PDF, imágenes, Word y texto tabulado. Si el alumno ya existe, se vincula con su ficha.</div>
+              <label for="imp-file-padres" style="display:block;padding:14px;background:#f8fafc;border:2px dashed #cbd5e1;border-radius:10px;text-align:center;cursor:pointer;font-family:'Sora',sans-serif;font-size:13px;color:#64748b;font-weight:600;transition:.2s;" onmouseover="this.style.borderColor='#c2410c';this.style.background='#fff7ed'" onmouseout="this.style.borderColor='#cbd5e1';this.style.background='#f8fafc'">
+                📁 Clic para seleccionar o arrastra aquí<br><span style="font-size:11px;font-weight:400;">.xlsx · .xls · .csv · .tsv · .txt · .pdf · .doc · .docx · imágenes</span>
+              </label>
+              <input type="file" id="imp-file-padres" accept=".xlsx,.xls,.csv,.tsv,.txt,.pdf,.doc,.docx,.png,.jpg,.jpeg,.webp" style="display:none;" onchange="admLeerArchivo(this,'padres')">
+            </div>
+          </div>
+          <div id="imp-preview-padres"></div>
+          <div id="imp-btn-padres" style="display:none;margin-top:16px;">
+            <button onclick="admConfirmarImport('padres')" style="padding:13px 28px;background:linear-gradient(135deg,#c2410c,#ea580c);color:white;border:none;border-radius:11px;font-family:'Sora',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(194,65,12,.3);">✅ Importar padres a SIEMBRA</button>
+            <button onclick="admLimpiarImport('padres')" style="margin-left:10px;padding:13px 20px;background:white;border:1.5px solid #e2e8f0;color:#64748b;border-radius:11px;font-family:'Sora',sans-serif;font-size:13px;cursor:pointer;">✕ Cancelar</button>
           </div>
         </div>
       </div>
@@ -7437,6 +7463,9 @@ html, body { min-height:100vh; font-family:'Sora',sans-serif; overflow-x:hidden;
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
           <div class="adm-card">
             <div class="adm-card-header" style="margin-bottom:14px;"><div class="adm-card-title">Datos del alumno</div></div>
+            <div style="margin-bottom:12px;padding:10px 12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;font-size:12px;color:#475569;">
+              Al seleccionar un alumno se cargarán primero sus datos del padrón y después, si ya existe, la ficha escolar previamente guardada.
+            </div>
             <div class="adm-form-row"><div class="adm-form-group"><label>Nombre(s)</label><input type="text" id="nf-nombre" placeholder="Nombre del alumno"></div><div class="adm-form-group"><label>Apellido paterno</label><input type="text" id="nf-ap" placeholder="Apellido paterno"></div></div>
             <div class="adm-form-row"><div class="adm-form-group"><label>Apellido materno</label><input type="text" id="nf-am" placeholder="Apellido materno"></div><div class="adm-form-group"><label>Fecha de nacimiento</label><input type="date" id="nf-nac"></div></div>
             <div class="adm-form-row"><div class="adm-form-group"><label>CURP</label><input type="text" id="nf-curp" placeholder="GARL100305MNLRPN07" maxlength="18" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div><div class="adm-form-group"><label>Sexo</label><select id="nf-sexo"><option value="F">Femenino</option><option value="M">Masculino</option></select></div></div>
@@ -7445,6 +7474,10 @@ html, body { min-height:100vh; font-family:'Sora',sans-serif; overflow-x:hidden;
           </div>
           <div class="adm-card">
             <div class="adm-card-header" style="margin-bottom:14px;"><div class="adm-card-title">Datos del tutor / padre de familia</div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+              <div style="font-size:12px;color:#64748b;">Esta sección se puede guardar desde la misma ficha y también se usa para vincular al padre por correo.</div>
+              <button onclick="nemFichaGuardar('padre')" style="padding:8px 14px;background:#fff7ed;border:1.5px solid #fdba74;color:#c2410c;border-radius:9px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">💾 Guardar padre</button>
+            </div>
             <div class="adm-form-row"><div class="adm-form-group"><label>Nombre completo</label><input type="text" id="nf-tutor-nom" placeholder="Nombre del tutor o responsable"></div><div class="adm-form-group"><label>Parentesco</label><select id="nf-tutor-rel"><option>Padre</option><option>Madre</option><option>Abuelo/a</option><option>Tío/a</option><option>Tutor legal</option></select></div></div>
             <div class="adm-form-row"><div class="adm-form-group"><label>Teléfono principal</label><input type="tel" id="nf-tutor-tel" placeholder="+52 81 1234 5678"></div><div class="adm-form-group"><label>Teléfono de emergencia</label><input type="tel" id="nf-tutor-tel2" placeholder="+52 81 8765 4321"></div></div>
             <div class="adm-form-group"><label>Correo electrónico</label><input type="email" id="nf-tutor-email" placeholder="correo&#64;familia.com"></div>

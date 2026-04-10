@@ -520,7 +520,7 @@ function siembraPropagar() {
 // IMPORTACIÓN MASIVA — Alumnos y Docentes (CSV + XLSX)
 // ══════════════════════════════════════════════════════════════════════
 
-window._impDatos = { alumnos: [], docentes: [] };
+window._impDatos = { alumnos: [], docentes: [], padres: [] };
 
 // Cargar SheetJS dinámicamente si no está
 function _cargarSheetJS() {
@@ -535,9 +535,10 @@ function _cargarSheetJS() {
 
 // Cambiar tab de importación
 function admImportTab(tab) {
-  ['alumnos','docentes'].forEach(t => {
+  ['alumnos','docentes','padres'].forEach(t => {
     document.getElementById('imp-panel-' + t).style.display = t === tab ? '' : 'none';
     const btn = document.getElementById('imp-tab-' + t);
+    if (!btn) return;
     if (t === tab) {
       btn.style.cssText = 'padding:10px 22px;border:none;background:none;font-family:\'Sora\',sans-serif;font-size:13px;font-weight:700;color:#0d5c2f;border-bottom:2px solid #0d5c2f;margin-bottom:-2px;cursor:pointer;';
     } else {
@@ -597,6 +598,22 @@ const _COL_MAP_DOCENTES = {
   rfc:          ['rfc','rfc_docente'],
 };
 
+const _COL_MAP_PADRES = {
+  nombre_padre:   ['nombre_padre','nombre tutor','padre','madre','tutor','responsable','nombre completo'],
+  parentesco:     ['parentesco','relacion','relación','tipo_tutor'],
+  telefono:       ['telefono','telefono_tutor','tel','celular','movil','móvil'],
+  telefono_2:     ['telefono_2','telefono2','emergencia','tel_emergencia'],
+  email:          ['email','correo','correo_tutor','email_padre','email tutor'],
+  domicilio:      ['domicilio','direccion','dirección','calle'],
+  municipio:      ['municipio','ciudad','localidad'],
+  cp:             ['cp','codigo postal','código postal'],
+  ocupacion:      ['ocupacion','ocupación','trabajo'],
+  escolaridad:    ['escolaridad','estudios'],
+  alumno_curp:    ['alumno_curp','curp_alumno','curp hijo','curp_hijo'],
+  alumno_nombre:  ['alumno_nombre','nombre_alumno','hijo','nombre del alumno'],
+  grupo:          ['grupo','grado_grupo','grupo alumno'],
+};
+
 function _mapearColumnas(headers, tipoMap) {
   const mapa = {};
   headers.forEach((h, i) => {
@@ -646,7 +663,7 @@ async function admLeerArchivo(input, tipo) {
 
     // Detectar fila de encabezados (buscar la primera fila con texto, no la de título)
     let headerRow = 0;
-    const tipoMap = tipo === 'alumnos' ? _COL_MAP_ALUMNOS : _COL_MAP_DOCENTES;
+    const tipoMap = tipo === 'alumnos' ? _COL_MAP_ALUMNOS : (tipo === 'padres' ? _COL_MAP_PADRES : _COL_MAP_DOCENTES);
     for (let i = 0; i < Math.min(5, rows.length); i++) {
       const mapa = _mapearColumnas(rows[i].map(String), tipoMap);
       if (Object.keys(mapa).length >= 2) { headerRow = i; break; }
@@ -665,12 +682,17 @@ async function admLeerArchivo(input, tipo) {
         obj[campo] = r[idx] !== undefined ? String(r[idx]).trim() : '';
       }
       return obj;
-    }).filter(d => tipo === 'alumnos' ? d.nombre : (d.nombre || d.email));
+    }).filter(d => {
+      if (tipo === 'alumnos') return d.nombre;
+      if (tipo === 'padres') return d.nombre_padre || d.email || d.alumno_nombre || d.alumno_curp;
+      return d.nombre || d.email;
+    });
 
     // Validar y marcar errores en los datos
     datos.forEach(d => {
       d._errores = [];
-      if (!d.nombre || d.nombre.length < 2) d._errores.push('Nombre inválido');
+      if (tipo === 'alumnos' && (!d.nombre || d.nombre.length < 2)) d._errores.push('Nombre inválido');
+      if (tipo === 'padres' && !((d.nombre_padre || '').length >= 2 || (d.email || '').length >= 5)) d._errores.push('Falta nombre o correo del padre');
       if (tipo === 'alumnos') {
         if (d.curp && d.curp.length !== 18) d._errores.push('CURP debe tener 18 caracteres');
       }
@@ -725,7 +747,9 @@ async function _admLeerArchivoIA(file, tipo) {
 
     const prompt = tipo === 'alumnos'
       ? `Eres un asistente escolar experto en leer listas, tablas y documentos administrativos. Analiza el archivo completo aunque venga en PDF, imagen, Word, Excel exportado o texto tabulado. Extrae TODOS los alumnos detectados y devuelve SOLO un array JSON. Cada objeto debe tener exactamente estas claves: nombre, apellido_p, apellido_m, curp, grupo. Prioridad máxima: separar correctamente nombre, apellido paterno y apellido materno. Si un campo no aparece, devuelve cadena vacía. Si detectas un nombre completo en una sola celda, intenta dividirlo con convención hispana: último apellido materno, penúltimo apellido paterno y el resto nombres, salvo que el documento ya indique columnas separadas. No inventes personas, no agregues texto extra, no uses markdown: solo JSON válido.`
-      : `Eres un asistente escolar experto en leer listas, tablas y documentos administrativos. Analiza el archivo completo aunque venga en PDF, imagen, Word, Excel exportado o texto tabulado. Extrae TODO el personal detectado y devuelve SOLO un array JSON. Cada objeto debe tener exactamente estas claves: nombre, apellidos, email, rol. Prioridad máxima: separar correctamente los nombres y apellidos tal como aparezcan en la tabla o documento. Si falta un campo, devuelve cadena vacía. No inventes personas, no agregues texto extra, no uses markdown: solo JSON válido.`;
+      : tipo === 'padres'
+        ? `Eres un asistente escolar experto en leer listas, tablas y documentos administrativos. Analiza el archivo completo y devuelve SOLO un array JSON válido. Cada objeto debe tener exactamente estas claves: nombre_padre, parentesco, telefono, email, alumno_nombre, alumno_curp, grupo. Si no aparece un dato usa cadena vacía. No inventes personas, no agregues texto extra y no uses markdown.`
+        : `Eres un asistente escolar experto en leer listas, tablas y documentos administrativos. Analiza el archivo completo aunque venga en PDF, imagen, Word, Excel exportado o texto tabulado. Extrae TODO el personal detectado y devuelve SOLO un array JSON. Cada objeto debe tener exactamente estas claves: nombre, apellidos, email, rol. Prioridad máxima: separar correctamente los nombres y apellidos tal como aparezcan en la tabla o documento. Si falta un campo, devuelve cadena vacía. No inventes personas, no agregues texto extra, no uses markdown: solo JSON válido.`;
 
     const resp = await fetch(`${supabaseUrl}/functions/v1/ai-router`, {
       method: 'POST',
@@ -752,22 +776,33 @@ async function _admLeerArchivoIA(file, tipo) {
     if (!datos.length) throw new Error('No se detectaron registros en el archivo. Verifica que sea legible.');
 
     // Normalize fields
-    datos = datos.map(d => ({
-      nombre:     (d.nombre || '').trim(),
-      apellido_p: (d.apellido_p || d.apellidos?.split(' ')[0] || '').trim(),
-      apellido_m: (d.apellido_m || d.apellidos?.split(' ').slice(1).join(' ') || '').trim(),
-      curp:       (d.curp || '').trim().toUpperCase(),
-      grupo:      (d.grupo || '').trim(),
-      email:      (d.email || '').trim().toLowerCase(),
-      rol:        d.rol || 'docente',
-      _errores:   [],
-    })).filter(d => d.nombre.length >= 2);
+    datos = datos.map(d => tipo === 'padres'
+      ? {
+          nombre_padre: (d.nombre_padre || '').trim(),
+          parentesco:   (d.parentesco || '').trim(),
+          telefono:     (d.telefono || '').trim(),
+          email:        (d.email || '').trim().toLowerCase(),
+          alumno_nombre:(d.alumno_nombre || '').trim(),
+          alumno_curp:  (d.alumno_curp || '').trim().toUpperCase(),
+          grupo:        (d.grupo || '').trim(),
+          _errores:     [],
+        }
+      : {
+          nombre:     (d.nombre || '').trim(),
+          apellido_p: (d.apellido_p || d.apellidos?.split(' ')[0] || '').trim(),
+          apellido_m: (d.apellido_m || d.apellidos?.split(' ').slice(1).join(' ') || '').trim(),
+          curp:       (d.curp || '').trim().toUpperCase(),
+          grupo:      (d.grupo || '').trim(),
+          email:      (d.email || '').trim().toLowerCase(),
+          rol:        d.rol || 'docente',
+          _errores:   [],
+        }).filter(d => tipo === 'padres' ? (d.nombre_padre || d.email || d.alumno_nombre) : d.nombre.length >= 2);
 
     // Validar
     datos.forEach(d => {
-      if (d.nombre.length < 2) d._errores.push('Nombre demasiado corto');
-      if (d.curp && d.curp.length !== 18) d._errores.push('CURP inválida (debe tener 18 caracteres)');
-      if (tipo === 'docentes' && d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) {
+      if (tipo !== 'padres' && d.nombre.length < 2) d._errores.push('Nombre demasiado corto');
+      if (tipo === 'alumnos' && d.curp && d.curp.length !== 18) d._errores.push('CURP inválida (debe tener 18 caracteres)');
+      if ((tipo === 'docentes' || tipo === 'padres') && d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) {
         d._errores.push('Email con formato incorrecto');
       }
     });
@@ -800,7 +835,9 @@ function admMostrarPreviewIA(tipo, datos) {
   const colorHeader = tipo === 'alumnos' ? '#0d5c2f' : '#1e3a5f';
   const camposMostrar = tipo === 'alumnos'
     ? ['nombre','apellido_p','apellido_m','grupo','curp']
-    : ['nombre','apellidos','email','rol'];
+    : tipo === 'padres'
+      ? ['nombre_padre','parentesco','telefono','email','alumno_nombre','alumno_curp','grupo']
+      : ['nombre','apellidos','email','rol'];
 
   // Grupo fallback panel — mismo que en el CSV
   const algunosSinGrupo = tipo === 'alumnos' && datos.some(d => !d.grupo || !d.grupo.trim());
@@ -888,7 +925,11 @@ function admMostrarPreview(tipo, datos, mapa, headers) {
   if (!previewEl) return;
 
   const camposDetectados = Object.keys(mapa);
-  const camposNecesarios = tipo === 'alumnos' ? ['nombre','apellido_p'] : ['nombre','email'];
+  const camposNecesarios = tipo === 'alumnos'
+    ? ['nombre','apellido_p']
+    : tipo === 'padres'
+      ? ['nombre_padre']
+      : ['nombre','email'];
   const faltantes = camposNecesarios.filter(c => !mapa[c]);
 
   if (faltantes.length) {
@@ -906,7 +947,9 @@ function admMostrarPreview(tipo, datos, mapa, headers) {
   const preview5 = datos.slice(0, 5);
   const camposMostrar = tipo === 'alumnos'
     ? ['nombre','apellido_p','apellido_m','grupo','email_alumno','email_padre']
-    : ['nombre','apellidos','email','rol','materia','grupo'];
+    : tipo === 'padres'
+      ? ['nombre_padre','parentesco','telefono','email','alumno_nombre','alumno_curp','grupo']
+      : ['nombre','apellidos','email','rol','materia','grupo'];
 
   // Detectar si algún alumno viene sin grupo
   const algunosSinGrupo = tipo === 'alumnos' && datos.some(d => !d.grupo || !d.grupo.trim());
@@ -1154,7 +1197,7 @@ async function admConfirmarImport(tipo) {
       }
     }
 
-  } else {
+  } else if (tipo === 'docentes') {
     // ── DOCENTES ──
     let session = null;
     try {
@@ -1242,6 +1285,86 @@ async function admConfirmarImport(tipo) {
       } catch(e) {
         errores++;
         errDetalle.push(`${d.email||d.nombre||'?'}: ${e.message}`);
+      }
+    }
+  } else {
+    const normalizar = (txt) => (txt || '').toString().trim().toLowerCase();
+    for (const d of datos) {
+      try {
+        const nombrePadre = (d.nombre_padre || '').trim();
+        const emailTutor  = (d.email || '').trim().toLowerCase();
+        if (!nombrePadre && !emailTutor) { saltados++; continue; }
+
+        let alumno = null;
+        if (d.alumno_curp && d.alumno_curp.length === 18) {
+          const { data } = await sbRef.from('usuarios').select('id,nombre,apellido_p,apellido_m').eq('curp', d.alumno_curp).maybeSingle();
+          alumno = data || null;
+        }
+        if (!alumno && d.alumno_nombre) {
+          const partes = normalizar(d.alumno_nombre).split(/\s+/).filter(Boolean);
+          let q = sbRef.from('usuarios')
+            .select('id,nombre,apellido_p,apellido_m')
+            .eq('rol', 'alumno')
+            .eq('escuela_cct', escuelaCct)
+            .limit(10);
+          if (partes[0]) q = q.ilike('nombre', `%${partes[0]}%`);
+          const { data } = await q;
+          alumno = (data || []).find(x => normalizar(`${x.nombre} ${x.apellido_p || ''} ${x.apellido_m || ''}`).includes(normalizar(d.alumno_nombre))) || null;
+        }
+
+        const payloadFicha = {
+          alumno_id: alumno?.id || null,
+          nombre: alumno?.nombre || null,
+          apellido_p: alumno?.apellido_p || null,
+          apellido_m: alumno?.apellido_m || null,
+          tutor_nombre: nombrePadre || null,
+          tutor_parentesco: d.parentesco || 'Tutor legal',
+          telefono_1: d.telefono || null,
+          telefono_2: d.telefono_2 || null,
+          email_tutor: emailTutor || null,
+          domicilio: d.domicilio || null,
+          municipio: d.municipio || null,
+          cp: d.cp || null,
+          ocupacion_tutor: d.ocupacion || null,
+          escolaridad_tutor: d.escolaridad || null,
+          grado: d.grupo || null,
+          escuela_cct: escuelaCct || null,
+          guardado: new Date().toISOString(),
+        };
+
+        if (alumno?.id) {
+          await sbRef.from('fichas_inscripcion').upsert(payloadFicha, { onConflict: 'alumno_id' });
+          if (emailTutor) {
+            await sbRef.from('invitaciones').upsert({
+              email_destino: emailTutor,
+              alumno_id: alumno.id,
+              rol: 'padre',
+              escuela_id: escuelaId || null,
+              escuela_cct: escuelaCct || null,
+              nombre_destino: nombrePadre || null,
+              estado: 'activa',
+              creado_en: new Date().toISOString(),
+            }, { onConflict: 'email_destino,alumno_id', ignoreDuplicates: true }).catch(() => {});
+          }
+          ok++;
+        } else {
+          await sbRef.from('solicitudes_acceso').insert({
+            nombre: nombrePadre || 'Padre/Madre',
+            apellido: '',
+            email: emailTutor || `pendiente_${Date.now()}_${Math.random().toString(36).slice(2,6)}@sin-correo.local`,
+            telefono: d.telefono || null,
+            rol: 'padre',
+            escuela_id: escuelaCct,
+            grupo_texto: d.alumno_nombre || d.grupo || null,
+            mensaje: `Importación masiva de padre/tutor. Alumno buscado: ${d.alumno_nombre || 'sin nombre'}${d.alumno_curp ? ` · CURP alumno: ${d.alumno_curp}` : ''}`,
+            estado: 'pendiente',
+            creado_en: new Date().toISOString(),
+          }).catch(() => {});
+          saltados++;
+        }
+      } catch(e) {
+        errores++;
+        errDetalle.push(`${d.nombre_padre || d.email || '?'}: ${e.message}`);
       }
     }
   }
@@ -1563,7 +1686,11 @@ function admLimpiarImport(tipo) {
   if (btnEl)   btnEl.style.display = 'none';
   if (fileEl)  fileEl.value = '';
   const btn = document.getElementById('imp-btn-' + tipo)?.querySelector('button');
-  if (btn) btn.textContent = tipo === 'alumnos' ? '✅ Importar alumnos a SIEMBRA' : '✅ Importar personal a SIEMBRA';
+  if (btn) btn.textContent = tipo === 'alumnos'
+    ? '✅ Importar alumnos a SIEMBRA'
+    : tipo === 'docentes'
+      ? '✅ Importar personal a SIEMBRA'
+      : '✅ Importar padres a SIEMBRA';
 }
 window.admLimpiarImport = admLimpiarImport;
 
@@ -1572,10 +1699,14 @@ function admDescargarPlantilla(tipo, formato) {
   if (formato === 'csv') {
     const headers = tipo === 'alumnos'
       ? 'nombre,apellido_p,apellido_m,curp,fecha_nac,num_lista,grupo,tutor_nombre,telefono_tutor,email_alumno,email_padre,sexo'
-      : 'nombre,apellidos,email,rol,turno,materia,grupo,num_empleado,telefono,nivel';
+      : tipo === 'padres'
+        ? 'nombre_padre,parentesco,telefono,email,alumno_nombre,alumno_curp,grupo'
+        : 'nombre,apellidos,email,rol,turno,materia,grupo,num_empleado,telefono,nivel';
     const ejemplo = tipo === 'alumnos'
       ? '\nAna,García,López,GALA100305MNLRPN07,2010-03-05,1,2° A,María López,8110001234,ana@gmail.com,maria@gmail.com,F'
-      : '\nLaura,Martínez Sánchez,laura@escuela.edu.mx,docente,matutino,Matemáticas,6° A,SEP-001,8110001111,primaria';
+      : tipo === 'padres'
+        ? '\nMaría López,Madre,8110001234,maria@gmail.com,Ana García López,GALA100305MNLRPN07,2° A'
+        : '\nLaura,Martínez Sánchez,laura@escuela.edu.mx,docente,matutino,Matemáticas,6° A,SEP-001,8110001111,primaria';
     const blob = new Blob([headers + ejemplo], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -1590,13 +1721,17 @@ function admDescargarPlantilla(tipo, formato) {
         ? [['nombre*','apellido_p*','apellido_m','curp','fecha_nac','num_lista','grupo','tutor_nombre','telefono_tutor','email_alumno','email_padre','sexo'],
            ['Ana','García','López','GALA100305MNLRPN07','2010-03-05',1,'2° A','María López','8110001234','ana@gmail.com','maria@gmail.com','F'],
            ['Carlos','Ramírez','Torres','','2011-08-12',2,'1° B','Roberto R.','8110005678','','roberto@hotmail.com','M']]
-        : [['nombre*','apellidos*','email*','rol','turno','materia','grupo','num_empleado','telefono','nivel'],
-           ['Laura','Martínez Sánchez','laura@escuela.edu.mx','docente','matutino','Matemáticas','6° A','SEP-001','8110001111','primaria'],
-           ['Carlos','Ramírez Torres','carlos@escuela.edu.mx','docente','matutino','Español','5° A','SEP-002','8110002222','primaria']];
+        : tipo === 'padres'
+          ? [['nombre_padre*','parentesco','telefono','email','alumno_nombre','alumno_curp','grupo'],
+             ['María López','Madre','8110001234','maria@gmail.com','Ana García López','GALA100305MNLRPN07','2° A'],
+             ['Roberto Ramírez','Padre','8110005678','roberto@hotmail.com','Carlos Ramírez Torres','','1° B']]
+          : [['nombre*','apellidos*','email*','rol','turno','materia','grupo','num_empleado','telefono','nivel'],
+             ['Laura','Martínez Sánchez','laura@escuela.edu.mx','docente','matutino','Matemáticas','6° A','SEP-001','8110001111','primaria'],
+             ['Carlos','Ramírez Torres','carlos@escuela.edu.mx','docente','matutino','Español','5° A','SEP-002','8110002222','primaria']];
       const ws = XLSX.utils.aoa_to_sheet(headers);
       // Ancho de columnas
       ws['!cols'] = headers[0].map(() => ({ wch: 20 }));
-      XLSX.utils.book_append_sheet(wb, ws, tipo === 'alumnos' ? 'Alumnos' : 'Personal');
+      XLSX.utils.book_append_sheet(wb, ws, tipo === 'alumnos' ? 'Alumnos' : (tipo === 'padres' ? 'Padres' : 'Personal'));
       XLSX.writeFile(wb, `plantilla_${tipo}_siembra.xlsx`);
       hubToast('✅ Plantilla descargada', 'ok');
     });
@@ -9410,18 +9545,19 @@ async function admAccesoTab(estado = 'pendiente') {
     lista.innerHTML = items.map(s => {
       const nombre = `${s.nombre||''} ${s.apellido||''}`.trim() || s.email;
       const fecha  = s.creado_en ? new Date(s.creado_en).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'}) : '—';
+      const alumnoRef = s.grupo_texto ? ` · Alumno: ${s.grupo_texto}` : '';
       return `<div style="background:white;border-radius:12px;border:1.5px solid #e2e8f0;padding:18px 20px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <span style="font-size:13px;font-weight:700;color:#0f172a;">${nombre}</span>
             <span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:99px;">${rolLabel[s.rol]||s.rol}</span>
           </div>
-          <div style="font-size:12px;color:#64748b;">${s.email}${s.telefono?' · '+s.telefono:''}${s.grupo_texto?' · Grupo: '+s.grupo_texto:''}${s.curp?' · CURP: '+s.curp:''}</div>
+          <div style="font-size:12px;color:#64748b;">${s.email}${s.telefono?' · '+s.telefono:''}${alumnoRef}${s.curp?' · CURP: '+s.curp:''}</div>
           ${s.mensaje?`<div style="font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic;">"${s.mensaje}"</div>`:''}
           <div style="font-size:11px;color:#cbd5e1;margin-top:4px;">${fecha}</div>
         </div>
         ${estado === 'pendiente' ? `<div style="display:flex;gap:8px;flex-shrink:0;">
-          <button onclick="admAprobarAcceso('${s.id}','${s.rol}','${nombre}','${s.email}')" style="padding:8px 16px;background:#0d5c2f;color:white;border:none;border-radius:8px;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">✅ Aprobar</button>
+          <button onclick="admAprobarAcceso('${s.id}')" style="padding:8px 16px;background:#0d5c2f;color:white;border:none;border-radius:8px;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">✅ Aprobar</button>
           <button onclick="admRechazarAcceso('${s.id}')" style="padding:8px 14px;background:#fef2f2;color:#b91c1c;border:1.5px solid #fecaca;border-radius:8px;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">✕ Rechazar</button>
         </div>` : `<div style="font-size:12px;font-weight:700;color:${estado==='aprobada'?'#15803d':'#b91c1c'}">${estado==='aprobada'?'✅ Aprobada':'✕ Rechazada'}</div>`}
       </div>`;
@@ -9431,22 +9567,119 @@ async function admAccesoTab(estado = 'pendiente') {
   }
 }
 
-async function admAprobarAcceso(id, rol, nombre, email) {
-  if (!confirm(`¿Aprobar el acceso de ${nombre}?\n\nSe creará su cuenta y recibirá instrucciones por correo.`)) return;
+function _admExtraerAlumnoSolicitado(sol) {
+  const texto = [sol?.grupo_texto || '', sol?.mensaje || ''].join(' ');
+  const m = texto.match(/Alumno solicitado:\s*([^·"\n]+)/i);
+  return (m?.[1] || sol?.grupo_texto || '').trim();
+}
+
+async function _admBuscarAlumnoParaSolicitud(sb, cct, sol) {
+  const curp = (sol?.curp || sol?.mensaje?.match(/CURP alumno:\s*([A-Z0-9]{10,18})/i)?.[1] || '').trim().toUpperCase();
+  if (curp) {
+    const { data } = await sb.from('usuarios')
+      .select('id,nombre,apellido_p,apellido_m')
+      .eq('rol', 'alumno').eq('curp', curp).maybeSingle();
+    if (data) return data;
+  }
+
+  const nombreAlumno = _admExtraerAlumnoSolicitado(sol);
+  if (!nombreAlumno) return null;
+
+  const partes = nombreAlumno.split(/\s+/).filter(Boolean);
+  let q = sb.from('usuarios')
+    .select('id,nombre,apellido_p,apellido_m')
+    .eq('rol', 'alumno')
+    .eq('escuela_cct', cct)
+    .limit(20);
+  if (partes[0]) q = q.ilike('nombre', `%${partes[0]}%`);
+  const { data } = await q;
+  const norm = s => (s || '').toString().trim().toLowerCase();
+  return (data || []).find(a => norm(`${a.nombre} ${a.apellido_p || ''} ${a.apellido_m || ''}`).includes(norm(nombreAlumno))) || null;
+}
+
+async function admAprobarAcceso(id) {
   const sb = window.sb;
   if (!sb) return;
   try {
+    const { data: sol, error: solErr } = await sb.from('solicitudes_acceso')
+      .select('*').eq('id', id).maybeSingle();
+    if (solErr) throw solErr;
+    if (!sol) throw new Error('Solicitud no encontrada');
+
+    const nombre = `${sol.nombre || ''} ${sol.apellido || ''}`.trim() || sol.email;
+    const email = (sol.email || '').trim().toLowerCase();
+    if (!confirm(`¿Aprobar el acceso de ${nombre}?\n\nSi se encuentra al alumno, el vínculo se hará automáticamente.`)) return;
+
     // Crear usuario en Supabase Auth
     const pass = Math.random().toString(36).slice(2,10); // temp password
     const cct  = ADM.escuelaCct || window.currentPerfil?.escuela_cct;
+    let authId = null;
     const { data: authData, error: authErr } = await sb.auth.admin?.createUser
       ? await sb.auth.admin.createUser({ email, password: pass, email_confirm: true })
       : { data: null, error: { message: 'admin API no disponible' } };
+    authId = authData?.user?.id || null;
+
+    let perfilPadre = null;
+    if (email) {
+      const { data: existente } = await sb.from('usuarios').select('id,auth_id,email').eq('email', email).maybeSingle();
+      if (existente?.id) {
+        perfilPadre = existente;
+        if (!existente.auth_id && authId) {
+          await sb.from('usuarios').update({ auth_id: authId, rol: 'padre', escuela_cct: cct || null, activo: true }).eq('id', existente.id);
+          perfilPadre.auth_id = authId;
+        }
+      } else {
+        const { data: nuevoPerfil, error: perfilErr } = await sb.from('usuarios').insert({
+          auth_id: authId,
+          nombre: sol.nombre || nombre,
+          apellido_p: sol.apellido || null,
+          email,
+          telefono: sol.telefono || null,
+          rol: 'padre',
+          activo: true,
+          escuela_cct: cct || null,
+          created_at: new Date().toISOString(),
+        }).select('id,auth_id,email').single();
+        if (!perfilErr) perfilPadre = nuevoPerfil;
+      }
+    }
+
+    let alumno = null;
+    let vinculado = false;
+    if (sol.rol === 'padre') {
+      alumno = await _admBuscarAlumnoParaSolicitud(sb, cct, sol);
+      if (perfilPadre?.id && alumno?.id) {
+        await sb.from('padres_alumnos').upsert({
+          padre_id: perfilPadre.id,
+          alumno_id: alumno.id,
+          activo: true,
+          escuela_id: ADM.escuelaId || null,
+        }, { onConflict: 'padre_id,alumno_id' }).catch(() => {});
+
+        if (email) {
+          await sb.from('invitaciones').upsert({
+            email_destino: email,
+            alumno_id: alumno.id,
+            rol: 'padre',
+            escuela_id: ADM.escuelaId || null,
+            escuela_cct: cct || null,
+            nombre_destino: nombre,
+            estado: 'activa',
+            creado_en: new Date().toISOString(),
+          }, { onConflict: 'email_destino,alumno_id', ignoreDuplicates: true }).catch(() => {});
+        }
+        vinculado = true;
+      }
+    }
 
     // Actualizar solicitud a aprobada (+ guardar temp password para notificación)
-    await sb.from('solicitudes_acceso').update({ estado:'aprobada', aprobado_en: new Date().toISOString() }).eq('id', id);
+    await sb.from('solicitudes_acceso').update({
+      estado:'aprobada',
+      aprobado_en: new Date().toISOString(),
+      mensaje: `${sol.mensaje || ''}${vinculado ? ` · Vinculado con ${alumno.nombre} ${alumno.apellido_p || ''}` : ''}`.trim(),
+    }).eq('id', id);
     admAccesoTab('pendiente');
-    hubToast(`✅ Acceso aprobado para ${nombre}. ${authErr?'Debe asignarse contraseña manualmente.':'Cuenta creada.'}`);
+    hubToast(`✅ Acceso aprobado para ${nombre}.${vinculado ? ' Padre vinculado con alumno.' : ''} ${authErr?'Debe asignarse contraseña manualmente.':'Cuenta creada.'}`);
   } catch(e) {
     hubToast('❌ ' + e.message);
   }

@@ -22,6 +22,7 @@ let calificaciones = [];
 let asistencias    = [];
 let preguntaRespondida = false;
 let chartRadar     = null;
+let escuelasAcceso = [];
 
 Object.defineProperties(window, {
   currentUser: {
@@ -2077,7 +2078,23 @@ function showRegister() {
 
 function showSolicitudAcceso() {
   closeModal('modal-register');
+  cargarEscuelasSolicitud().catch(() => {});
   openModal('modal-solicitud-acceso');
+}
+
+async function cargarEscuelasSolicitud() {
+  const sel = document.getElementById('sol-escuela');
+  if (!sel || !sbHub) return;
+  if (!escuelasAcceso.length) {
+    const { data } = await sbHub.from('escuelas')
+      .select('id,nombre,cct,activa')
+      .eq('activa', true)
+      .order('nombre', { ascending: true })
+      .limit(500);
+    escuelasAcceso = data || [];
+  }
+  sel.innerHTML = '<option value="">Selecciona una escuela</option>' +
+    escuelasAcceso.map(e => `<option value="${e.cct || e.id}">${e.nombre}${e.cct ? ` · ${e.cct}` : ''}</option>`).join('');
 }
 
 async function doSolicitudAcceso() {
@@ -2087,6 +2104,7 @@ async function doSolicitudAcceso() {
   const tel     = (document.getElementById('sol-tel')?.value || '').trim();
   const hijo    = (document.getElementById('sol-hijo')?.value || '').trim();
   const escuela = (document.getElementById('sol-escuela')?.value || '').trim();
+  const escuelaTxt = document.getElementById('sol-escuela')?.selectedOptions?.[0]?.textContent?.trim() || '';
   const mensaje = (document.getElementById('sol-mensaje')?.value || '').trim();
   const errEl   = document.getElementById('sol-error');
   const btn     = document.getElementById('btn-solicitud');
@@ -2103,9 +2121,9 @@ async function doSolicitudAcceso() {
       nombre, apellido, email,
       telefono: tel||null,
       rol: 'padre',
-      escuela_id: escuela,  // admin identifica por CCT o nombre
+      escuela_id: escuela,
       grupo_texto: hijo||null,
-      mensaje: mensaje||null,
+      mensaje: [mensaje, hijo ? `Alumno solicitado: ${hijo}` : '', escuelaTxt ? `Escuela: ${escuelaTxt}` : ''].filter(Boolean).join(' · ') || null,
       estado: 'pendiente',
       creado_en: new Date().toISOString(),
     });

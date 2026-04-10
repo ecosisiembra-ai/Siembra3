@@ -990,8 +990,11 @@ html, body {
       <input class="form-input" type="text" id="sol-hijo" placeholder="Nombre del alumno">
     </div>
     <div class="form-group">
-      <label class="form-label">Clave del plantel (CCT) o nombre de la escuela</label>
-      <input class="form-input" type="text" id="sol-escuela" placeholder="Ej. 15EPR0001A o nombre del plantel">
+      <label class="form-label">Escuela</label>
+      <select class="form-input" id="sol-escuela">
+        <option value="">Selecciona una escuela</option>
+      </select>
+      <div style="font-size:11px;color:var(--gris-400);margin-top:4px">Elige la escuela para que la solicitud llegue al admin correcto.</div>
     </div>
     <div class="form-group">
       <label class="form-label">Mensaje (opcional)</label>

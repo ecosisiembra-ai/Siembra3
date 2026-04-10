@@ -493,6 +493,7 @@ async function admCargarAlumnosAdmin() {
         <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:#8890a8;text-transform:uppercase;">CURP</th>
         <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:#8890a8;text-transform:uppercase;">Grupo</th>
         <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:#8890a8;text-transform:uppercase;">Estado</th>
+        <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:#8890a8;text-transform:uppercase;">Acciones</th>
       </tr></thead>
       <tbody>${data.map((r,i) => {
         const u = r.usuarios || {};
@@ -503,7 +504,11 @@ async function admCargarAlumnosAdmin() {
           <td style="padding:9px 14px;font-size:11px;font-family:monospace;color:#64748b;">${u.curp||'—'}</td>
           <td style="padding:9px 14px;"><span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${r.grupos?.nombre||'—'}</span></td>
           <td style="padding:9px 14px;"><span style="background:${u.activo?'#dcfce7':'#fee2e2'};color:${u.activo?'#15803d':'#dc2626'};padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">${u.activo?'Activo':'Inactivo'}</span></td>
-        <td style="padding:9px 14px;">
+          <td style="padding:9px 14px;">
+            <button onclick="admExpedienteAbrirModal('${r.usuarios?.id||''}','${encodeURIComponent(nom)}')"
+              style="padding:4px 10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:6px;font-family:'Sora',sans-serif;font-size:11px;cursor:pointer;margin-right:6px;">
+              🧾 Historial
+            </button>
             <button onclick="admGenerarVinculoPadre('${r.usuarios?.id||''}','${r.usuarios ? (r.usuarios.nombre+' '+(r.usuarios.apellido_p||'')).trim() : '—'}')"
               style="padding:4px 10px;background:#f0fdf4;border:1px solid #86efac;color:#15803d;border-radius:6px;font-family:'Sora',sans-serif;font-size:11px;cursor:pointer;">
               📲 QR padre
@@ -1289,4 +1294,3 @@ function adminInit() { if(window.ADM){ ADM._initialized = false; ADM.sb=sb; ADM.
     <td style="padding:10px 14px;">${!r[3]?`<button onclick="this.closest('tr').querySelector('span').outerHTML='<span style=\'background:#dcfce7;color:#15803d;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;\'>✅ Aprobado</span>';this.remove();hubToast('✅ ${r[0]} aprobado','ok')" style="padding:5px 11px;background:#dcfce7;color:#15803d;border:1.5px solid #86efac;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;">✅ Aprobar</button>`:'<span style="color:#8890a8;font-size:11px;">—</span>'}</td>
   </tr>`).join('');
 }
-

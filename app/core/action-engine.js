@@ -12084,10 +12084,23 @@ async function admExpedientesCargar() {
   if (!sbRef || !lista) return;
   lista.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">Cargando…</div>';
   try {
-    let q = sbRef.from('alumnos').select('id,nombre,curp,grado,seccion,documentos').eq('escuela_cct', cct).eq('activo', true).order('nombre');
-    if (grado) q = q.eq('grado', grado);
+    let q = sbRef.from('usuarios')
+      .select('id,nombre,apellido_p,apellido_m,curp,alumnos_grupos(grupo_id,ciclo,ciclo_escolar,grupos(nombre,grado,seccion))')
+      .eq('escuela_cct', cct).eq('rol', 'alumno').eq('activo', true).order('nombre');
     const { data } = await q;
-    window._expData = data || [];
+    let rows = (data || []).map(u => {
+      const ag = (u.alumnos_grupos || []).find(x => x.grupos?.grado != null) || u.alumnos_grupos?.[0] || {};
+      return {
+        id: u.id,
+        nombre: `${u.nombre || ''} ${u.apellido_p || ''} ${u.apellido_m || ''}`.trim(),
+        curp: u.curp || '',
+        grado: String(ag.grupos?.grado || '').trim(),
+        seccion: ag.grupos?.seccion || '',
+        documentos: {},
+      };
+    });
+    if (grado) rows = rows.filter(r => String(r.grado) === String(grado));
+    window._expData = rows;
     admExpedientesFiltrar();
   } catch(e) { lista.innerHTML = `<div style="padding:20px;color:#b91c1c;text-align:center;">Error: ${e.message}</div>`; }
 }
@@ -12117,10 +12130,191 @@ function admExpedientesFiltrar() {
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:11px;color:#64748b;">${a.entregados}/${totalDocs} documentos</span><span style="font-size:11px;font-weight:700;color:${a.pct===100?'#15803d':'#92400e'};">${a.pct}%</span></div>
         <div style="height:6px;background:#f1f5f9;border-radius:99px;overflow:hidden;"><div style="height:100%;border-radius:99px;background:${a.pct===100?'#22c55e':'#f59e0b'};width:${a.pct}%;transition:.4s;"></div></div>
       </div>
-      <button onclick="admExpedienteAbrirModal('${a.id}')" style="padding:7px 14px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:#475569;white-space:nowrap;">Ver expediente</button>
+      <button onclick="admExpedienteAbrirModal('${a.id}','${encodeURIComponent(a.nombre || '')}')" style="padding:7px 14px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:#475569;white-space:nowrap;">Ver expediente</button>
     </div>`).join('');
 }
-function admExpedienteAbrirModal(id) { ADM.toast && ADM.toast('📋 Expediente: función en desarrollo'); }
+function _admExpBadge(bg, col, txt) {
+  return `<span style="background:${bg};color:${col};padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">${txt}</span>`;
+}
+
+async function admExpedienteAbrirModal(id, nombreEnc = '') {
+  const sbRef = window.sb;
+  const nombrePre = decodeURIComponent(nombreEnc || '');
+  if (!sbRef || !id) { ADM.toast && ADM.toast('Sin conexión a datos'); return; }
+
+  const vacio = '<div style="font-size:12px;color:#94a3b8;">Sin registros todavía.</div>';
+  try {
+    const [
+      usrRes, gruposRes, fichaRes, calsRes, asRes, obsRes, incRes, tsRes, orientRes, alertRes
+    ] = await Promise.all([
+      sbRef.from('usuarios').select('id,nombre,apellido_p,apellido_m,curp').eq('id', id).maybeSingle(),
+      sbRef.from('alumnos_grupos').select('ciclo,ciclo_escolar,grupos(nombre,grado,seccion)').eq('alumno_id', id).order('ciclo_escolar', { ascending: false }),
+      sbRef.from('fichas_inscripcion').select('*').eq('alumno_id', id).maybeSingle(),
+      sbRef.from('calificaciones').select('materia,calificacion,ciclo').eq('alumno_id', id).order('ciclo', { ascending: false }),
+      sbRef.from('asistencia').select('fecha,estado,ciclo').eq('alumno_id', id).order('fecha', { ascending: false }).limit(120),
+      sbRef.from('observaciones').select('contenido,texto,created_at,ciclo,autor_id').eq('alumno_id', id).order('created_at', { ascending: false }).limit(20),
+      sbRef.from('incidencias').select('tipo,descripcion,estado,created_at,ciclo').eq('alumno_id', id).order('created_at', { ascending: false }).limit(20),
+      sbRef.from('casos_ts').select('*').eq('alumno_id', id).order('created_at', { ascending: false }).limit(10),
+      sbRef.from('entrevistas_orientador').select('*').eq('alumno_id', id).order('fecha', { ascending: false }).limit(10),
+      sbRef.from('alertas').select('tipo,mensaje,created_at,ciclo,leido').eq('alumno_id', id).order('created_at', { ascending: false }).limit(15),
+    ]);
+
+    const usuario = usrRes.data || { id, nombre: nombrePre };
+    const grupos = gruposRes.data || [];
+    const ficha = fichaRes.data || null;
+    const califs = calsRes.data || [];
+    const asist = asRes.data || [];
+    const obs = obsRes.data || [];
+    const incs = incRes.data || [];
+    const casosTs = tsRes.data || [];
+    const orient = orientRes.data || [];
+    const alertas = alertRes.data || [];
+
+    const nombre = `${usuario.nombre || nombrePre || 'Alumno'} ${usuario.apellido_p || ''} ${usuario.apellido_m || ''}`.trim();
+    const cicloMap = {};
+    grupos.forEach(g => {
+      const ciclo = g.ciclo_escolar || g.ciclo || window.CICLO_ACTIVO || 'Sin ciclo';
+      if (!cicloMap[ciclo]) cicloMap[ciclo] = { grupo: g.grupos?.nombre || `${g.grupos?.grado || ''}° ${g.grupos?.seccion || ''}`.trim(), promedioVals: [], incidencias: 0, observaciones: 0 };
+    });
+    califs.forEach(c => {
+      const ciclo = c.ciclo || window.CICLO_ACTIVO || 'Sin ciclo';
+      if (!cicloMap[ciclo]) cicloMap[ciclo] = { grupo: '—', promedioVals: [], incidencias: 0, observaciones: 0 };
+      if (c.calificacion != null) cicloMap[ciclo].promedioVals.push(parseFloat(c.calificacion) || 0);
+    });
+    incs.forEach(i => {
+      const ciclo = i.ciclo || window.CICLO_ACTIVO || 'Sin ciclo';
+      if (!cicloMap[ciclo]) cicloMap[ciclo] = { grupo: '—', promedioVals: [], incidencias: 0, observaciones: 0 };
+      cicloMap[ciclo].incidencias++;
+    });
+    obs.forEach(o => {
+      const ciclo = o.ciclo || window.CICLO_ACTIVO || 'Sin ciclo';
+      if (!cicloMap[ciclo]) cicloMap[ciclo] = { grupo: '—', promedioVals: [], incidencias: 0, observaciones: 0 };
+      cicloMap[ciclo].observaciones++;
+    });
+
+    const ciclos = Object.entries(cicloMap).sort((a,b) => String(b[0]).localeCompare(String(a[0]))).map(([ciclo, info]) => ({
+      ciclo,
+      grupo: info.grupo || '—',
+      promedio: info.promedioVals.length ? (info.promedioVals.reduce((a,b) => a+b, 0) / info.promedioVals.length).toFixed(1) : '—',
+      incidencias: info.incidencias || 0,
+      observaciones: info.observaciones || 0,
+    }));
+
+    const presentes = asist.filter(a => a.estado === 'presente').length;
+    const ausentes = asist.filter(a => a.estado === 'ausente').length;
+    const pctAsistencia = asist.length ? Math.round((presentes / asist.length) * 100) : 0;
+    const promedioActual = ciclos[0]?.promedio || '—';
+
+    const fortalezas = [];
+    if (promedioActual !== '—' && parseFloat(promedioActual) >= 8) fortalezas.push('Buen rendimiento académico reciente');
+    if (pctAsistencia >= 90) fortalezas.push('Asistencia constante');
+    if ((incs[0]?.estado || '') !== 'urgente' && incs.length <= 2) fortalezas.push('Baja incidencia conductual reciente');
+    if (ficha?.programa_apoyo) fortalezas.push(`Cuenta con apoyo: ${ficha.programa_apoyo}`);
+
+    const alertasSeguimiento = [];
+    if (pctAsistencia && pctAsistencia < 85) alertasSeguimiento.push('Revisar ausentismo');
+    if (promedioActual !== '—' && parseFloat(promedioActual) < 7) alertasSeguimiento.push('Acompañamiento académico');
+    if (incs.some(i => i.estado === 'urgente')) alertasSeguimiento.push('Hay incidencias urgentes previas');
+    if (casosTs.length) alertasSeguimiento.push('Tiene seguimiento de Trabajo Social');
+
+    const mkList = (items, render) => items.length
+      ? `<div style="display:flex;flex-direction:column;gap:8px;">${items.map(render).join('')}</div>`
+      : vacio;
+
+    const contenido = `
+      <div style="display:flex;flex-direction:column;gap:16px;max-width:980px;">
+        <div style="background:linear-gradient(135deg,#0d5c2f,#157a40);border-radius:16px;padding:18px;color:white;">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div style="width:56px;height:56px;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;">${nombre.charAt(0) || 'A'}</div>
+            <div style="flex:1;min-width:220px;">
+              <div style="font-family:'Fraunces',serif;font-size:22px;font-weight:700;">${nombre}</div>
+              <div style="font-size:12px;opacity:.85;">CURP: ${usuario.curp || '—'} · Tutor: ${ficha?.tutor_nombre || '—'}</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <div style="background:rgba(255,255,255,.16);border-radius:12px;padding:10px 14px;min-width:90px;text-align:center;"><div style="font-size:20px;font-weight:900;">${promedioActual}</div><div style="font-size:10px;opacity:.8;">Promedio actual</div></div>
+              <div style="background:rgba(255,255,255,.16);border-radius:12px;padding:10px 14px;min-width:90px;text-align:center;"><div style="font-size:20px;font-weight:900;">${pctAsistencia || 0}%</div><div style="font-size:10px;opacity:.8;">Asistencia</div></div>
+              <div style="background:rgba(255,255,255,.16);border-radius:12px;padding:10px 14px;min-width:90px;text-align:center;"><div style="font-size:20px;font-weight:900;">${ciclos.length}</div><div style="font-size:10px;opacity:.8;">Ciclos en historial</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:16px;">
+          <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+            <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:12px;">Trayectoria por ciclo escolar</div>
+            ${mkList(ciclos, c => `
+              <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+                <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                  <div style="font-weight:700;color:#0f172a;">${c.ciclo}</div>
+                  <div style="font-size:12px;color:#64748b;">Grupo: ${c.grupo}</div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                  ${_admExpBadge('#dcfce7','#166534',`Promedio ${c.promedio}`)}
+                  ${_admExpBadge('#eff6ff','#1d4ed8',`${c.observaciones} observaciones`)}
+                  ${_admExpBadge(c.incidencias ? '#fee2e2' : '#f8fafc', c.incidencias ? '#b91c1c' : '#64748b', `${c.incidencias} incidencias`)}
+                </div>
+              </div>`)}
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+              <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:10px;">Fortalezas y recursos</div>
+              ${fortalezas.length ? `<ul style="margin:0;padding-left:18px;color:#374151;font-size:12px;line-height:1.7;">${fortalezas.map(f => `<li>${f}</li>`).join('')}</ul>` : vacio}
+            </div>
+            <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+              <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:10px;">Puntos de continuidad</div>
+              ${alertasSeguimiento.length ? `<ul style="margin:0;padding-left:18px;color:#374151;font-size:12px;line-height:1.7;">${alertasSeguimiento.map(f => `<li>${f}</li>`).join('')}</ul>` : vacio}
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;">
+          <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+            <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:12px;">Observaciones docentes</div>
+            ${mkList(obs.slice(0,8), o => `
+              <div style="padding:10px 12px;border-left:3px solid #1d4ed8;background:#f8fbff;border-radius:0 10px 10px 0;">
+                <div style="font-size:12px;color:#374151;">${o.contenido || o.texto || 'Observación registrada'}</div>
+                <div style="font-size:10px;color:#94a3b8;margin-top:4px;">${o.ciclo || 'Sin ciclo'} · ${o.created_at ? new Date(o.created_at).toLocaleDateString('es-MX') : '—'}</div>
+              </div>`)}
+          </div>
+
+          <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+            <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:12px;">Conducta e incidencias</div>
+            ${mkList(incs.slice(0,8), i => `
+              <div style="padding:10px 12px;border-left:3px solid ${i.estado === 'urgente' ? '#b91c1c' : '#d97706'};background:#fffaf5;border-radius:0 10px 10px 0;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                  <strong style="font-size:12px;color:#0f172a;">${i.tipo || 'Incidencia'}</strong>
+                  ${_admExpBadge(i.estado === 'urgente' ? '#fee2e2' : '#fef3c7', i.estado === 'urgente' ? '#b91c1c' : '#a16207', i.estado || 'abierta')}
+                </div>
+                <div style="font-size:12px;color:#374151;">${i.descripcion || 'Sin descripción'}</div>
+                <div style="font-size:10px;color:#94a3b8;margin-top:4px;">${i.ciclo || 'Sin ciclo'} · ${i.created_at ? new Date(i.created_at).toLocaleDateString('es-MX') : '—'}</div>
+              </div>`)}
+          </div>
+
+          <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+            <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:12px;">Trabajo Social y orientación</div>
+            ${mkList([...casosTs.slice(0,4), ...orient.slice(0,4)], i => `
+              <div style="padding:10px 12px;border-left:3px solid ${i.fecha ? '#7c3aed' : '#0369a1'};background:#faf7ff;border-radius:0 10px 10px 0;">
+                <div style="font-size:12px;color:#374151;">${i.descripcion || i.motivo || i.observaciones || i.acuerdos || 'Seguimiento registrado'}</div>
+                <div style="font-size:10px;color:#94a3b8;margin-top:4px;">${i.fecha || i.created_at ? new Date(i.fecha || i.created_at).toLocaleDateString('es-MX') : '—'}</div>
+              </div>`)}
+          </div>
+
+          <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+            <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:12px;">Alertas institucionales</div>
+            ${mkList(alertas.slice(0,8), a => `
+              <div style="padding:10px 12px;border-left:3px solid ${a.leido ? '#94a3b8' : '#dc2626'};background:#fff8f8;border-radius:0 10px 10px 0;">
+                <div style="font-size:12px;color:#374151;">${a.mensaje || a.tipo || 'Alerta registrada'}</div>
+                <div style="font-size:10px;color:#94a3b8;margin-top:4px;">${a.ciclo || 'Sin ciclo'} · ${a.created_at ? new Date(a.created_at).toLocaleDateString('es-MX') : '—'}</div>
+              </div>`)}
+          </div>
+        </div>
+      </div>`;
+
+    hubModal(`🧾 Expediente histórico · ${nombre}`, contenido, () => {}, 'Cerrar');
+  } catch(e) {
+    hubToast('❌ Error al cargar expediente: ' + e.message, 'err');
+  }
+}
 window.admExpedientesCargar = admExpedientesCargar;
 window.admExpedientesFiltrar = admExpedientesFiltrar;
 window.admExpedienteAbrirModal = admExpedienteAbrirModal;

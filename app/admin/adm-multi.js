@@ -2307,16 +2307,38 @@ ADM.agregarMateria = async function(docenteId) {
 
     window._admAsignaciones[docenteId].push({
       id:     realId || Date.now().toString(),
-      materia: campoFormativo ? `${campoFormativo} — ${materia}` : materia,
+      materia,
+      campo_formativo: campoFormativo,
       grupo:   grupoNom,
       grupo_id: grupoId,
       ciclo,
       turno,
     });
 
+    if (!Array.isArray(window._admMateriasData)) window._admMateriasData = [];
+    const docenteObj = ADM.docentes.find(d => d.id === docenteId) || {};
+    window._admMateriasData.push({
+      id: realId || Date.now().toString(),
+      docente_id: docenteId,
+      grupo_id: grupoId || null,
+      materia,
+      ciclo,
+      usuarios: {
+        nombre: docenteObj.nombre || '',
+        apellido_p: docenteObj.apellido || docenteObj.apellido_p || '',
+      },
+      grupos: {
+        nombre: grupoNom,
+        turno,
+        grado: grupoObj?.grado || null,
+        escuela_cct: grupoObj?.escuela_cct || ADM.escuelaCct || window.currentPerfil?.escuela_cct || null,
+      },
+    });
+
     ADM.toast(`✅ ${materia} asignada a ${grupoNom}`);
     ADM.cerrarModal();
     ADM.renderAsignaciones();
+    ADM.renderMaterias();
     // Reabrir para ver estado actualizado
     setTimeout(() => {
       const d = ADM.docentes.find(x => x.id === docenteId);
@@ -2333,8 +2355,13 @@ ADM.quitarMateria = async function(docenteId, asignId) {
     if (window._admAsignaciones?.[docenteId]) {
       window._admAsignaciones[docenteId] = window._admAsignaciones[docenteId].filter(a => a.id !== asignId);
     }
+    if (Array.isArray(window._admMateriasData)) {
+      window._admMateriasData = window._admMateriasData.filter(a => a.id !== asignId);
+    }
     ADM.toast('✅ Materia removida');
     ADM.cerrarModal();
+    ADM.renderAsignaciones();
+    ADM.renderMaterias();
   } catch(e) { ADM.toast('❌ ' + e.message, 'err'); }
 };
 
@@ -3110,13 +3137,51 @@ function admPersonalHubTab(tab) {
   });
 }
 window.admPersonalHubTab = admPersonalHubTab;
+ADM._getAsignacionesFlat = function() {
+  if (Array.isArray(window._admMateriasData) && window._admMateriasData.length) {
+    return window._admMateriasData;
+  }
+
+  const store = ADM.asignacionesPorDocente || window._admAsignaciones || {};
+  const docentesMap = new Map((ADM.docentes || []).map(d => [String(d.id), d]));
+  const gruposMap = new Map((ADM.grupos || []).map(g => [String(g.id), g]));
+
+  return Object.entries(store).flatMap(([docenteId, rows]) => {
+    const docente = docentesMap.get(String(docenteId)) || {};
+    return (rows || []).map((row, index) => {
+      const grupo = gruposMap.get(String(row.grupo_id || '')) || null;
+      return {
+        id: row.id || `cache-${docenteId}-${index}`,
+        docente_id: docenteId,
+        grupo_id: row.grupo_id || null,
+        materia: row.materia || '',
+        ciclo: row.ciclo || window.CICLO_ACTIVO,
+        usuarios: {
+          nombre: docente.nombre || '',
+          apellido_p: docente.apellido || docente.apellido_p || '',
+        },
+        grupos: grupo ? {
+          nombre: grupo.nombre || `${grupo.grado || ''}° ${grupo.seccion || 'A'}`.trim(),
+          turno: grupo.turno || null,
+          grado: grupo.grado || null,
+          escuela_cct: grupo.escuela_cct || ADM.escuelaCct || window.currentPerfil?.escuela_cct || null,
+        } : {
+          nombre: row.grupo || 'Todos',
+          turno: row.turno || null,
+          grado: null,
+          escuela_cct: ADM.escuelaCct || window.currentPerfil?.escuela_cct || null,
+        },
+      };
+    });
+  });
+};
 ADM.renderMaterias = function() {
   const el = document.getElementById('adm-materias-cat-list');
   if (!el) return;
   ADM.renderPersonalMateriasResumen();
 
   const nivelEsc = ADM.escuelaNivel || window._admNivelActivo || window._nivelActivo || 'secundaria';
-  const asignaciones = window._admMateriasData || [];
+  const asignaciones = ADM._getAsignacionesFlat();
 
   // ── Estructura por año y campo formativo ──────────────────────
   const GRADOS_SEC = [

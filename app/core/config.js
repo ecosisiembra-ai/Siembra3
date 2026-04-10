@@ -5,6 +5,9 @@
  * En desarrollo local, se usa el fallback o el instalador.
  */
 (function () {
+  const _host = String(window.location.hostname || '').toLowerCase();
+  const _isLocalDev = _host === 'localhost' || _host === '127.0.0.1' || _host === '';
+
   // 1. Configuración inyectada en build-time (Vercel Edge Config / env vars)
   //    Dejar vacío en desarrollo; rellenar en el proceso de CI/CD.
   const _BUILD_CFG = (typeof __SIEMBRA_BUILD_CFG__ !== 'undefined')
@@ -27,8 +30,28 @@
     version: '17.0',
   };
 
-  // Orden de prioridad: build > instalador > defaults
-  const resolved = Object.assign({}, _DEFAULTS, _installerCfg || {}, _BUILD_CFG || {});
+  const _installerCredsValid = !!(
+    _installerCfg?.url
+    && /^https:\/\//i.test(String(_installerCfg.url))
+    && String(_installerCfg.url).includes('supabase.co')
+    && String(_installerCfg?.key || '').length > 20
+  );
+
+  const _installerMeta = _installerCfg ? {
+    nombre: _installerCfg.nombre,
+    cct: _installerCfg.cct,
+    nivel_default: _installerCfg.nivel_default,
+    plan: _installerCfg.plan,
+  } : {};
+
+  // En producción compartida, no dejar que credenciales guardadas localmente
+  // rompan el acceso global. Solo se respetan credenciales del instalador en local.
+  const resolved = Object.assign(
+    {},
+    _DEFAULTS,
+    _isLocalDev && _installerCredsValid ? _installerCfg : _installerMeta,
+    _BUILD_CFG || {}
+  );
 
   window.SIEMBRA_CONFIG = {
     supabaseUrl: resolved.supabaseUrl || resolved.url || _DEFAULTS.supabaseUrl,

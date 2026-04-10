@@ -456,9 +456,18 @@ window.SiembraHub = (function() {
       _abrirPortalPorRol(perfil.rol);
     } catch (e) {
       if (errEl) {
-        errEl.textContent = e.message === 'Invalid login credentials'
+        const rawMessage = String(e?.message || '');
+        const normalized = rawMessage.toLowerCase();
+        errEl.textContent = rawMessage === 'Invalid login credentials'
           ? '❌ Correo o contrasena incorrectos.'
-          : (e.message || 'Error al iniciar sesion.');
+          : (
+            normalized.includes('504')
+            || normalized.includes('gateway')
+            || normalized.includes('failed to fetch')
+            || normalized.includes('network')
+          )
+            ? '❌ No se pudo conectar con el servicio de acceso. Intenta de nuevo en unos minutos o recarga la pagina.'
+            : (rawMessage || 'Error al iniciar sesion.');
         errEl.style.display = 'block';
       }
     } finally {

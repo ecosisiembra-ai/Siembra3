@@ -45,14 +45,11 @@
 <script src="app/core/csv-import.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-// ── PANEL INSTALADOR: credenciales por escuela ─────────────────────────────
-// Si hay credenciales guardadas por el instalador, úsalas. Si no, fallback.
+// ── Configuración resuelta centralmente en app/core/config.js ─────────────
 const _instCfg = (function() {
   try { return JSON.parse(localStorage.getItem('siembra_escuela_cfg') || 'null'); } catch(e) { return null; }
 })();
-// ── URL unificada: hub único maoioxmnfzzwnuinesyt ──
-const _URL_HUB = 'https://maoioxmnfzzwnuinesyt.supabase.co';
-const _KEY_HUB = 'sb_publishable_fNwG2bdRTbrV-JCF7of8hA_TDjSXplY';
+const _CFG_HUB = window.SIEMBRA_CONFIG || {};
 
 // URLs de los portales
 const _URL_PORTAL_ALUMNO  = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
@@ -65,13 +62,20 @@ const _URL_PORTAL_ADMIN   = (location.hostname === 'localhost' || location.hostn
   ? '/sa.html'
   : (location.origin + '/sa.html');
 
-const SUPABASE_URL = _instCfg?.url || _URL_HUB;
-const SUPABASE_KEY = _instCfg?.key || _KEY_HUB;
+const SUPABASE_URL = _CFG_HUB.supabaseUrl || window.SUPABASE_URL;
+const SUPABASE_KEY = _CFG_HUB.supabaseKey || window.SUPABASE_KEY;
 
 // Guardar cfg para que alumno y familia la hereden via localStorage
 (function _syncCfgUnificada() {
   try {
-    const cfg = _instCfg || { url: SUPABASE_URL, key: SUPABASE_KEY, nombre: '', cct: '', nivel_default: 'secundaria' };
+    const cfg = {
+      url: SUPABASE_URL,
+      key: SUPABASE_KEY,
+      nombre: _CFG_HUB.escuelaNombre || _instCfg?.nombre || '',
+      cct: _CFG_HUB.escuelaCct || _instCfg?.cct || '',
+      nivel_default: _CFG_HUB.nivelDefault || _instCfg?.nivel_default || 'secundaria',
+      plan: _CFG_HUB.plan || _instCfg?.plan || 'base',
+    };
     if (!localStorage.getItem('siembra_supabase_url')) {
       localStorage.setItem('siembra_supabase_url', cfg.url);
       localStorage.setItem('siembra_supabase_key', cfg.key);
@@ -79,7 +83,15 @@ const SUPABASE_KEY = _instCfg?.key || _KEY_HUB;
   } catch(e) {}
 })();
 
-window._escuelaCfg = _instCfg || { url: SUPABASE_URL, key: SUPABASE_KEY, nombre: '', cct: '', nivel_default: 'secundaria' };
+window._escuelaCfg = {
+  ...(window._escuelaCfg || {}),
+  nombre: _CFG_HUB.escuelaNombre || _instCfg?.nombre || window._escuelaCfg?.nombre || '',
+  cct: _CFG_HUB.escuelaCct || _instCfg?.cct || window._escuelaCfg?.cct || '',
+  nivel_default: _CFG_HUB.nivelDefault || _instCfg?.nivel_default || window._escuelaCfg?.nivel_default || 'secundaria',
+  plan: _CFG_HUB.plan || _instCfg?.plan || window._escuelaCfg?.plan || 'base',
+  url: SUPABASE_URL,
+  key: SUPABASE_KEY,
+};
 
 // ── SISTEMA DE PLANES: acceso por escuela ─────────────────────────────────
 const SIEMBRA_PLAN_ROLES = {

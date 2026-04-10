@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════════════════════
-//  SIEMBRA — Service Worker v1.0
+//  SIEMBRA — Service Worker v1.1
 //  PWA: caché offline + notificaciones push
 // ═══════════════════════════════════════════════════════════
 
-const CACHE_NAME    = 'siembra-v3'; // v3: manifests separados por portal
-const CACHE_DYNAMIC = 'siembra-dynamic-v3';
+const CACHE_NAME    = 'siembra-v4'; // v4: refresco forzado de shell admin
+const CACHE_DYNAMIC = 'siembra-dynamic-v4';
 
 // Archivos a cachear para modo offline
 const ASSETS_STATIC = [

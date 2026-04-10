@@ -11779,8 +11779,11 @@ html, body { min-height:100vh; font-family:'Sora',sans-serif; overflow-x:hidden;
 // PWA: Service Worker registration (sw.js) — habilita modo offline y PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(r => console.log('[SW] Registrado:', r.scope))
+    navigator.serviceWorker.register('/sw.js?v=20260409-1', { updateViaCache: 'none' })
+      .then(async r => {
+        try { await r.update(); } catch(_) {}
+        console.log('[SW] Registrado:', r.scope);
+      })
       .catch(e => console.warn('[SW] Error:', e));
   });
 }

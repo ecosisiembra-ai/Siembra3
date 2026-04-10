@@ -2999,9 +2999,14 @@ ADM.confirmarImportarCSV = async function() {
 
 
 function admAsigTab(tab) {
+  if (typeof window.admPersonalHubTab === 'function') {
+    window.admPersonalHubTab(tab === 'catalogo' ? 'catalogo' : 'asignaciones');
+  }
   const isCatalogo = tab === 'catalogo';
-  document.getElementById('adm-asig-panel-catalogo').style.display = isCatalogo ? '' : 'none';
-  document.getElementById('adm-asig-panel-asig').style.display     = isCatalogo ? 'none' : '';
+  const panelCatalogo = document.getElementById('adm-asig-panel-catalogo');
+  const panelAsig = document.getElementById('adm-asig-panel-asig');
+  if (panelCatalogo) panelCatalogo.style.display = isCatalogo ? '' : 'none';
+  if (panelAsig) panelAsig.style.display = isCatalogo ? 'none' : '';
   const btnCat  = document.getElementById('adm-asig-tab-catalogo');
   const btnAsig = document.getElementById('adm-asig-tab-asig');
   if (btnCat) {
@@ -3015,6 +3020,31 @@ function admAsigTab(tab) {
     btnAsig.style.fontWeight  = isCatalogo ? '600' : '700';
   }
 }
+function admPersonalHubTab(tab) {
+  const current = tab || 'equipo';
+  const panels = {
+    equipo: document.getElementById('adm-personal-panel-equipo'),
+    catalogo: document.getElementById('adm-personal-panel-catalogo'),
+    asignaciones: document.getElementById('adm-personal-panel-asignaciones'),
+  };
+  Object.entries(panels).forEach(([key, el]) => {
+    if (el) el.style.display = key === current ? '' : 'none';
+  });
+
+  const tabs = {
+    equipo: document.getElementById('adm-personal-tab-equipo'),
+    catalogo: document.getElementById('adm-personal-tab-catalogo'),
+    asignaciones: document.getElementById('adm-personal-tab-asignaciones'),
+  };
+  Object.entries(tabs).forEach(([key, btn]) => {
+    if (!btn) return;
+    const active = key === current;
+    btn.style.color = active ? '#0d5c2f' : '#64748b';
+    btn.style.borderBottom = active ? '2px solid #0d5c2f' : '2px solid transparent';
+    btn.style.fontWeight = active ? '700' : '600';
+  });
+}
+window.admPersonalHubTab = admPersonalHubTab;
 ADM.renderMaterias = function() {
   const el = document.getElementById('adm-materias-cat-list');
   if (!el) return;

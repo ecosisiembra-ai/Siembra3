@@ -1082,8 +1082,8 @@ async function admCargarAsignaciones() {
     window._admMateriasData = filtrados; // Exponer para renderMaterias
 
     if (wrap) admRenderTablaAsignaciones(filtrados);
-    // Actualizar catálogo si está visible
-    if (ADM.paginaActual === 'asignaciones') ADM.renderMaterias();
+    // Actualizar catálogo si está visible en la vista unificada
+    if (ADM.paginaActual === 'asignaciones' || ADM.paginaActual === 'docentes') ADM.renderMaterias();
   } catch(e) {
     console.warn('[admMaterias]', e.message);
     admRenderAsignacionesDemo();

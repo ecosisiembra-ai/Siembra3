@@ -3,10 +3,10 @@ window.SiembraAdminNav = (function() {
     dashboard: 'Dashboard',
     grupos: 'Grupos y salones',
     cobertura: 'Cobertura academica',
-    docentes: 'Personal escolar',
+    docentes: 'Personal y materias',
     alumnos: 'Alumnos',
     materias: 'Materias',
-    asignaciones: 'Asignaciones',
+    asignaciones: 'Personal y materias',
     importar: 'Importar CSV',
     vinculos: 'Codigos QR',
     solicitudes: 'Vinculaciones Padre-Alumno',
@@ -49,12 +49,14 @@ window.SiembraAdminNav = (function() {
   }
 
   function runPageHooks(ADM, page) {
-    if (page === 'asignaciones') {
+    if (page === 'docentes') {
+      ADM.renderDocentes?.();
       ADM.renderMaterias?.();
       ADM.renderAsignaciones?.();
-      if (typeof window.admAsigTab === 'function') {
-        window.admAsigTab('catalogo');
+      if (typeof window.admPersonalHubTab === 'function') {
+        window.admPersonalHubTab(ADM._personalHubTab || 'equipo');
       }
+      ADM._personalHubTab = null;
     }
 
     if (page === 'cobertura') {
@@ -108,6 +110,12 @@ window.SiembraAdminNav = (function() {
   }
 
   function navTo(ADM, page) {
+    if (page === 'asignaciones') {
+      ADM._personalHubTab = 'asignaciones';
+      page = 'docentes';
+    } else if (page === 'docentes' && !ADM._personalHubTab) {
+      ADM._personalHubTab = 'equipo';
+    }
     activatePage(page);
     ADM.paginaActual = page;
     updateTopbar(page);
